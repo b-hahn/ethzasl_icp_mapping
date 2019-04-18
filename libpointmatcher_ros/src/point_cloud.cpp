@@ -11,13 +11,13 @@
 namespace PointMatcher_ros
 {
 	using namespace std;
-	
+
 	//! Transform a ROS PointCloud2 message into a libpointmatcher point cloud
 	template<typename T>
 	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::PointCloud2& rosMsg, const bool isDense)
 	{
 
-		//FIXME: continue from here, need to decode time properly   
+		//FIXME: continue from here, need to decode time properly
 		typedef PointMatcher<T> PM;
 		typedef PointMatcherIO<T> PMIO;
 		typedef typename PMIO::PMPropTypes PM_types;
@@ -26,10 +26,10 @@ namespace PointMatcher_ros
 		typedef typename DataPoints::Labels Labels;
 		typedef typename DataPoints::View View;
 		typedef typename DataPoints::TimeView TimeView;
-		
+
 		if (rosMsg.fields.empty())
 			return DataPoints();
-		
+
 
 		// fill labels
 		// conversions of descriptor fields from pcl
@@ -106,12 +106,11 @@ namespace PointMatcher_ros
 		featLabels.push_back(Label("pad", 1));
 		assert(isFeature.size() == rosMsg.fields.size());
 		assert(fieldTypes.size() == rosMsg.fields.size());
-		
 		// create cloud
 		const unsigned pointCount(rosMsg.width * rosMsg.height);
 		DataPoints cloud(featLabels, descLabels, timeLabels, pointCount);
 		cloud.getFeatureViewByName("pad").setConstant(1);
-		
+
 		// fill cloud
 		// TODO: support big endian, pass through endian-swapping method just after the *reinterpret_cast
 		typedef sensor_msgs::PointField PF;
@@ -147,7 +146,7 @@ namespace PointMatcher_ros
 					}
 				}
 			}
-			else if(boost::algorithm::ends_with(it->name, "_splitTime_high32") || 
+			else if(boost::algorithm::ends_with(it->name, "_splitTime_high32") ||
 			        boost::algorithm::ends_with(it->name, "_splitTime_low32"))
 			{
 				string startingName = it->name;
@@ -165,7 +164,7 @@ namespace PointMatcher_ros
 
 			  TimeView timeView(cloud.getTimeViewByName(startingName));
 				// use view to read data
-        
+
 				int ptId(0);
         const size_t count(std::max<size_t>(it->count, 1));
         for (size_t y(0); y < rosMsg.height; ++y)
@@ -307,7 +306,6 @@ namespace PointMatcher_ros
 			}
 		}
 
-		
 		if(isDense == false)
 		{
 			shared_ptr<typename PM::DataPointsFilter> filter(PM::get().DataPointsFilterRegistrar.create("RemoveNaNDataPointsFilter"));
@@ -316,13 +314,12 @@ namespace PointMatcher_ros
 
 		return cloud;
 	}
-	
+
 	template
 	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::PointCloud2& rosMsg, const bool isDense);
 	template
 	PointMatcher<double>::DataPoints rosMsgToPointMatcherCloud<double>(const sensor_msgs::PointCloud2& rosMsg, const bool isDense);
-	
-	
+
 	template<typename T>
 	typename PointMatcher<T>::DataPoints rosMsgToPointMatcherCloud(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D, const bool addTimestamps, const bool addObservationDirection)
 	{
@@ -331,7 +328,7 @@ namespace PointMatcher_ros
 		typedef typename DataPoints::Label Label;
 		typedef typename DataPoints::Labels Labels;
 		typedef typename DataPoints::View View;
-		
+
 		Labels featLabels;
 		featLabels.push_back(Label("x", 1));
 		featLabels.push_back(Label("y", 1));
@@ -339,7 +336,7 @@ namespace PointMatcher_ros
 			featLabels.push_back(Label("z", 1));
 
 		featLabels.push_back(Label("pad", 1));
-		
+
     // Build descriptors
 		Labels descLabels;
 		if (!rosMsg.intensities.empty())
@@ -347,13 +344,12 @@ namespace PointMatcher_ros
 			descLabels.push_back(Label("intensity", 1));
 			assert(rosMsg.intensities.size() == rosMsg.ranges.size());
 		}
-    
+
     int id_obs = 0;
     if(addObservationDirection)
     {
 			descLabels.push_back(Label("observationDirections", 3));
     }
-		
 		// Build time
 		Labels timeLabels;
     if(addTimestamps)
@@ -393,16 +389,16 @@ namespace PointMatcher_ros
 
 		DataPoints cloud(featLabels, descLabels, timeLabels, goodCount);
 		cloud.getFeatureViewByName("pad").setConstant(1);
-      
+
     if(addObservationDirection)
     {
       id_obs = cloud.getDescriptorStartingRow("observationDirections");
     }
-		
+
 		// fill features
 		const ros::Time& startTime(rosMsg.header.stamp);
 		const ros::Time endTime(startTime + ros::Duration(rosMsg.time_increment * (rosMsg.ranges.size() - 1)));
-    
+
 		for (size_t i = 0; i < ranges.size(); ++i)
 		{
 			const T angle = rosMsg.angle_min + ids[i]*rosMsg.angle_increment;
@@ -411,7 +407,7 @@ namespace PointMatcher_ros
       const T y = sin(angle) * range;
 
       // the turn ratio correct for the fact that not all sensor scan
-      // continuously during 360 deg 
+      // continuously during 360 deg
 			//TODO: check that. FP
       const float turnRatio = (rosMsg.angle_max - rosMsg.angle_min)/(2*M_PI);
       // dt_point should be more precise than rosMsg.time_increment
@@ -419,7 +415,7 @@ namespace PointMatcher_ros
 
       if (listener)
       {
-        
+
         const ros::Time curTime(rosMsg.header.stamp + ros::Duration(ids[i] * dt_point));
 
         // wait for transform
@@ -437,7 +433,7 @@ namespace PointMatcher_ros
         pin.point.x = x;
         pin.point.y = y;
         pin.point.z = 0;
-        
+
         // transform sensor center
         geometry_msgs::PointStamped s_in, s_out;
         s_in.header.stamp = curTime;
@@ -481,7 +477,7 @@ namespace PointMatcher_ros
         cloud.features(1,i) = p_out.point.y;
         if(force3D)
           cloud.features(2,i) = p_out.point.z;
-				
+
         if(addObservationDirection)
         {
           cloud.descriptors(id_obs  , i) = s_out.point.x - p_out.point.x;
@@ -519,7 +515,7 @@ namespace PointMatcher_ros
 		//cerr << "point cloud:\n" << cloud.times.leftCols(10) << endl;
 		return cloud;
 	}
-	
+
 	template
 	PointMatcher<float>::DataPoints rosMsgToPointMatcherCloud<float>(const sensor_msgs::LaserScan& rosMsg, const tf::TransformListener* listener, const std::string& fixedFrame, const bool force3D, const bool addTimestamps, const bool addObservationDirection);
 	template
@@ -532,7 +528,7 @@ namespace PointMatcher_ros
 
 		sensor_msgs::PointCloud2 rosCloud;
 		typedef sensor_msgs::PointField PF;
-		
+
 		// check type and get sizes
 		BOOST_STATIC_ASSERT(is_floating_point<T>::value);
 		BOOST_STATIC_ASSERT((is_same<T, long double>::value == false));
@@ -548,9 +544,7 @@ namespace PointMatcher_ros
 			dataType = PF::FLOAT64;
 			scalarSize = 8;
 		}
-		
 		size_t timeSize = 4; // we split in two UINT32
-		
 		// build labels
 
 		// features
@@ -582,11 +576,13 @@ namespace PointMatcher_ros
 			offset += scalarSize;
 			addZ = true;
 		}
-		
+
 		// descriptors
 		const bool isDescriptor(!pmCloud.descriptorLabels.empty());
 		bool hasColor(false);
+		bool hasSemantics(false);
 		unsigned colorPos(0);
+		unsigned semanticsPos(0);
 		unsigned colorCount(0);
 		unsigned inDescriptorPos(0);
 		for(auto it(pmCloud.descriptorLabels.begin()); it != pmCloud.descriptorLabels.end(); ++it)
@@ -627,14 +623,26 @@ namespace PointMatcher_ros
 				rosCloud.fields.push_back(pointField);
 				offset += 4;
 			}
+			else if (it->text == "semantics_rgb")
+			{
+				semanticsPos = inDescriptorPos;
+				hasSemantics = true;
+				pointField.datatype = uint8_t(PF::UINT32);
+				pointField.name = "semantics_rgb";
+				pointField.offset = offset;
+				pointField.count = 1;
+				rosCloud.fields.push_back(pointField);
+				offset += 4;
+			}
 			else
 			{
-				pointField.datatype = dataType;
+				pointField.datatype = uint8_t(PF::UINT32);
 				pointField.name = it->text;
 				pointField.offset = offset;
 				pointField.count = it->span;
 				rosCloud.fields.push_back(pointField);
 				offset += it->span * scalarSize;
+				std::cout << "descriptor label text: " << it->text << std::endl;
 			}
 			inDescriptorPos += it->span;
 		}
@@ -667,7 +675,7 @@ namespace PointMatcher_ros
 				pointField.count = 1;
 				rosCloud.fields.push_back(pointField);
 				offset += timeSize;
-				
+
 				pointField.datatype = PF::UINT32;
 				pointField.name = it->text + "_splitTime_low32";
 				pointField.offset = offset;
@@ -691,16 +699,18 @@ namespace PointMatcher_ros
 		rosCloud.row_step = rosCloud.point_step * rosCloud.width;
 		rosCloud.is_dense = true;
 		rosCloud.data.resize(rosCloud.row_step * rosCloud.height);
-		
+
 		const unsigned featureDim(pmCloud.features.rows()-1);
 		const unsigned descriptorDim(pmCloud.descriptors.rows());
 		const unsigned timeDim(pmCloud.times.rows());
-		
+
 		assert(descriptorDim == inDescriptorPos);
 		const unsigned postColorPos(colorPos + colorCount);
+		const unsigned postSemanticsPos(semanticsPos + 1);
 		assert(postColorPos <= inDescriptorPos);
 		const unsigned postColorCount(descriptorDim - postColorPos);
-		
+		const unsigned postSemanticsCount(descriptorDim - postSemanticsPos);
+		std::cout << "postColorCount: " << std::to_string(postColorCount) << " and postSemanticsCount: " << std::to_string(postSemanticsCount) << std::endl;
 		for (unsigned pt(0); pt < rosCloud.width; ++pt)
 		{
 			uint8_t *fPtr(&rosCloud.data[pt * offset]);
@@ -730,8 +740,16 @@ namespace PointMatcher_ros
 					rgba = colorA << 24 | colorR << 16 | colorG << 8 | colorB;
 					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&rgba), 4);
 					fPtr += 4;
+					// check if semantics_rgb value present
+					if (hasSemantics) {
+						uint32_t semantics_rgb = unsigned(pmCloud.descriptors(semanticsPos+0, pt));
+						memcpy(fPtr, reinterpret_cast<const uint8_t*>(&semantics_rgb), 4);
+						fPtr += 4;
+						std::cout << " semantics_rgb: " << std::to_string(semantics_rgb) << std::endl;
+					}
 					// after color
-					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(postColorPos, pt)), scalarSize * postColorCount);
+					// memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(postColorPos, pt)), scalarSize * postColorCount);
+					memcpy(fPtr, reinterpret_cast<const uint8_t*>(&pmCloud.descriptors(postSemanticsPos, pt)), scalarSize * postSemanticsCount);
 					fPtr += scalarSize * postColorCount;
 				}
 				else
@@ -740,7 +758,7 @@ namespace PointMatcher_ros
 					fPtr += scalarSize * descriptorDim;
 				}
 			}
-
+			std::cout << "Got here!\n";
 			// TODO: reactivate that properly
 			//if(isTime)
 			//{
@@ -754,25 +772,25 @@ namespace PointMatcher_ros
 			//		fPtr += timeSize;
 			//	}
 			//}
-			if (hasTime) 
+			if (hasTime)
 			{
 			  // PointCloud2 can not contain uint64_t variables
 			  // uint32_t are used for publishing, pmCloud.times(0, pt)/1000 (time in micro seconds)
-			  
+
 				//uint32_t temp = (uint32_t)(pmCloud.times(0, pt)/(uint64_t)1000);
 
 				const size_t ptrSize = timeSize * timeDim;
-				
+
 				// Elapsed time
 			  const float elapsedTime = (float)(pmCloud.times(0, pt) - pmCloud.times(0, 0))*1e-9f;
 			  memcpy(fPtr, reinterpret_cast<const uint8_t*>(&elapsedTime), ptrSize);
 				fPtr += ptrSize;
-				
+
 				// high32
 				const uint32_t high32 = (uint32_t)(pmCloud.times(0, pt) >> 32);
 			  memcpy(fPtr, reinterpret_cast<const uint8_t*>(&high32), ptrSize);
 				fPtr += ptrSize;
-				
+
 				// low32
 				const uint32_t low32 = (uint32_t)(pmCloud.times(0, pt));
 			  memcpy(fPtr, reinterpret_cast<const uint8_t*>(&low32), ptrSize);
@@ -784,10 +802,10 @@ namespace PointMatcher_ros
 		// fill remaining information
 		rosCloud.header.frame_id = frame_id;
 		rosCloud.header.stamp = stamp;
-		
+
 		return rosCloud;
 	}
-	
+
 	template
 	sensor_msgs::PointCloud2 pointMatcherCloudToRosMsg<float>(const PointMatcher<float>::DataPoints& pmCloud, const std::string& frame_id, const ros::Time& stamp);
 	template
